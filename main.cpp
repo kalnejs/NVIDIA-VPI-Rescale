@@ -11,6 +11,8 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/videoio.hpp>
 
+#define USE_NVIDIA_CSI_CAMERA   0U
+
 #define CHECK_STATUS(STMT)                                    \
     do                                                        \
     {                                                         \
@@ -25,15 +27,21 @@
         }                                                     \
     } while (0);
 
-std::string gstreamer_pipeline (int id, int mode, int capture_width, int capture_height, int display_width, int display_height, int framerate, int flip_method) {
-    return "nvarguscamerasrc sensor-id=" + std::to_string(id) + " sensor-mode=" + std::to_string(mode) + " ! video/x-raw(memory:NVMM), width=(int)" + std::to_string(capture_width) + ", height=(int)" +
-           std::to_string(capture_height) + ", format=(string)NV12, framerate=(fraction)" + std::to_string(framerate) +
-           "/1 ! nvvidconv flip-method=" + std::to_string(flip_method) + " ! video/x-raw, width=(int)" + std::to_string(display_width) + ", height=(int)" +
-           std::to_string(display_height) + ", format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink";
-}
+#if (USE_NVIDIA_CSI_CAMERA == 1U)
+  std::string gstreamer_pipeline (int id, int mode, int capture_width, int capture_height, int display_width, int display_height, int framerate, int flip_method) {
+      return "nvarguscamerasrc sensor-id=" + std::to_string(id) + " sensor-mode=" + std::to_string(mode) + " ! video/x-raw(memory:NVMM), width=(int)" + std::to_string(capture_width) + ", height=(int)" +
+             std::to_string(capture_height) + ", format=(string)NV12, framerate=(fraction)" + std::to_string(framerate) +
+             "/1 ! nvvidconv flip-method=" + std::to_string(flip_method) + " ! video/x-raw, width=(int)" + std::to_string(display_width) + ", height=(int)" +
+             std::to_string(display_height) + ", format=(string)BGRx ! videoconvert ! video/x-raw, format=(string)BGR ! appsink";
+  }
+#endif
+
 
 int main(int argc, char *argv[]){
 
+  cv::VideoCapture camera;
+
+#if (USE_NVIDIA_CSI_CAMERA == 1U)
   int id = 0;
   int mode = 3;
   int capture_width = 1280 ;
@@ -49,11 +57,13 @@ int main(int argc, char *argv[]){
         display_height,
         framerate,
         flip_method);
+
   std::cout << "Using pipeline: \n\t" << pipeline << "\n";
 
-  cv::VideoCapture camera;
-
   camera.open(pipeline, cv::CAP_GSTREAMER);
+#else
+  camera.open(0);
+#endif
 
   // check if we succeeded
   if (!camera.isOpened()) {
