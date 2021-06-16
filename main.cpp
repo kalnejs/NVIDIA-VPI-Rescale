@@ -9,6 +9,7 @@
 #include <vpi/OpenCVInterop.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
 
 #define CHECK_STATUS(STMT)                                    \
     do                                                        \
@@ -26,10 +27,20 @@
 
 int main(int argc, char *argv[]){
 
-  cv::Mat inImage;
+  cv::VideoCapture camera;
 
-  inImage = cv::imread("aloeL.jpg",cv::IMREAD_COLOR);
-  cv::imshow("image0", inImage);
+  camera.open(0);
+
+  // check if we succeeded
+  if (!camera.isOpened()) {
+      printf("ERROR! Unable to open camera\n");
+      return -1;
+  }
+
+  cv::Mat inImage;
+  camera.read(inImage);
+  //inImage = cv::imread("aloeL.jpg",cv::IMREAD_COLOR);
+  //cv::imshow("image0", inImage);
 
   //Wrap cv::Mat
   VPIImage wrapImage;
@@ -55,27 +66,33 @@ int main(int argc, char *argv[]){
   VPIStream stream;
   CHECK_STATUS(vpiStreamCreate(VPI_BACKEND_CPU, &stream));
 
+  while(true){
+    camera.read(inImage);
 
-  CHECK_STATUS(vpiSubmitRescale(stream, VPI_BACKEND_CPU, wrapImage, imgSmall,
-                    VPI_INTERP_LINEAR, VPI_BORDER_CLAMP, 0));
+    vpiImageSetWrappedOpenCVMat(wrapImage, inImage);
 
-  CHECK_STATUS(vpiSubmitConvertImageFormat(stream, VPI_BACKEND_CPU, imgSmall,
-                          imgGray, NULL));
+    CHECK_STATUS(vpiSubmitRescale(stream, VPI_BACKEND_CPU, wrapImage, imgSmall,
+                      VPI_INTERP_LINEAR, VPI_BORDER_CLAMP, 0));
 
-  CHECK_STATUS(vpiSubmitBoxFilter(stream, VPI_BACKEND_CPU, imgGray, imgFilter,
-                        3, 3, VPI_BORDER_ZERO));
+    CHECK_STATUS(vpiSubmitConvertImageFormat(stream, VPI_BACKEND_CPU, imgSmall,
+                            imgGray, NULL));
 
-  vpiStreamSync(stream);
+    CHECK_STATUS(vpiSubmitBoxFilter(stream, VPI_BACKEND_CPU, imgGray, imgFilter,
+                          3, 3, VPI_BORDER_ZERO));
 
-  VPIImageData imgdata;
-  CHECK_STATUS(vpiImageLock(imgFilter, VPI_LOCK_READ, &imgdata));
+    vpiStreamSync(stream);
 
-  cv::Mat outFrame;
-  CHECK_STATUS(vpiImageDataExportOpenCVMat(imgdata, &outFrame));
+    VPIImageData imgdata;
+    CHECK_STATUS(vpiImageLock(imgFilter, VPI_LOCK_READ, &imgdata));
 
-  cv::imshow("image1", outFrame);
-  cv::waitKey(0);
+    cv::Mat outFrame;
+    CHECK_STATUS(vpiImageDataExportOpenCVMat(imgdata, &outFrame));
 
+    CHECK_STATUS(vpiImageUnlock(imgFilter));
+
+    cv::imshow("image1", outFrame);
+    cv::waitKey(1);
+  }
 
 
   vpiStreamDestroy(stream);

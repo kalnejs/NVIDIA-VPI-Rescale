@@ -8,5 +8,5 @@ find_package(CUDA REQUIRED)
 
 add_executable(${PROJECT_NAME} main.cpp)
 
-target_link_libraries(${PROJECT_NAME} vpi opencv_core opencv_highgui)
+target_link_libraries(${PROJECT_NAME} vpi opencv_core opencv_highgui opencv_videoio)
 target_link_libraries(${PROJECT_NAME} opencv_imgcodecs)
